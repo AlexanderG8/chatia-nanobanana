@@ -75,7 +75,6 @@ export function useZombieGame(){
     }
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) =>{
-        debugger;
         e.preventDefault();
         if(!input.trim() || isLoading) return
 
