@@ -120,3 +120,15 @@
     @apply bg-background text-foreground;
   }
 }
+
+
+.pixelated{
+  image-rendering: -moz-crisp-edges;
+  image-rendering:  -webkit-crisp-edges;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+p+p {
+  margin-top: 16px;
+}

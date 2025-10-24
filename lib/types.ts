@@ -5,8 +5,8 @@ export interface GameMassage {
     id: string;
     role: "user" | "assistant";
     content: string;
-    image?: string;
-    imageLoading?: string
+    image?: GeneratedImage;
+    imageLoading?: boolean
 }
 // Aquí se define la interfaz GeneratedImage que representa una imagen generada
 export interface GeneratedImage {
