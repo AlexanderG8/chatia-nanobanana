@@ -1,6 +1,5 @@
 import {useState, useEffect} from 'react';
-import type { GameMassage, ConversationMessage, GenerateStoryResponse } from '@/lib/types';
-import { stringify } from 'querystring';
+import type { GameMassage, GenerateStoryResponse } from '@/lib/types';
 
 export function useZombieGame(){
     const [messages, setMessages] = useState<GameMassage[]>([]);
@@ -76,10 +75,9 @@ export function useZombieGame(){
     }
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) =>{
+        debugger;
         e.preventDefault();
-        if(input.trim() || isLoading){
-            return;
-        }
+        if(!input.trim() || isLoading) return
 
         const userMessage: GameMassage = {
             id: crypto.randomUUID(),
@@ -125,7 +123,7 @@ export function useZombieGame(){
         }
     }
 
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) =>{
+    const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) =>{
         setInput(e.target.value);
     }
 
