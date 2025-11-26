@@ -20,5 +20,8 @@ export const GAME_CONFIG = {
     IMAGE: {
         DEFAULT_PROMPT: 'zombie apocalypse scene pixel art style',
         SEPARATOR: 'IMAGEN: '
+    },
+    INVENTORY: {
+        MAX_ITEMS: 10 // Límite máximo de tipos de items diferentes en el inventario
     }
 }

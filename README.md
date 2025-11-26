@@ -137,7 +137,6 @@ npm run lint     # Ejecutar linter
 - [ ] Sistema de inventario
 - [ ] Múltiples finales
 - [ ] Guardado de partidas
-- [ ] Modo multijugador
 - [ ] Sonidos y música de fondo -->
 
 ---
