@@ -142,4 +142,4 @@ npm run lint     # Ejecutar linter
 
 ---
 
-Desarrollado con ❤️ usando Next.js y Google Gemini AI
+Desarrollado con ❤️ & ☕ usando Next.js y Google Gemini AI
