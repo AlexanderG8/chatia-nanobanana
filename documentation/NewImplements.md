@@ -401,3 +401,244 @@ Este documento detalla las tareas necesarias para implementar las nuevas caracte
 - ✅ **Sonidos y Música de Fondo:** COMPLETADO (100%)
 
 **🎉 TODAS LAS FEATURES IMPLEMENTADAS EXITOSAMENTE 🎉**
+
+---
+
+## 🗄️ 5. Sistema de Base de Datos y Autenticación (EN PROGRESO)
+
+### 5.1 Instalación y Configuración de Prisma ✅
+- [X] Instalar dependencias de Prisma:
+  - `npm install prisma --save-dev`
+  - `npm install @prisma/client`
+- [X] Inicializar Prisma: `npx prisma init`
+- [X] Configurar `.env` con DATABASE_URL (ya existe)
+- [X] Configurar `prisma/schema.prisma` con provider PostgreSQL
+
+### 5.2 Diseño de Esquema de Base de Datos ✅
+- [X] Crear modelo `User` en `schema.prisma`:
+  - `id`: String (UUID)
+  - `username`: String (unique)
+  - `email`: String (unique)
+  - `createdAt`: DateTime
+  - `updatedAt`: DateTime
+  - Relación: `savedGames` (uno a muchos con SavedGame)
+- [X] Crear modelo `SavedGame` en `schema.prisma`:
+  - `id`: String (UUID)
+  - `userId`: String (FK a User)
+  - `name`: String
+  - `turnNumber`: Int
+  - `survivalTime`: Int
+  - `thumbnail`: String? (base64 opcional)
+  - `isAutoSave`: Boolean
+  - `createdAt`: DateTime
+  - `updatedAt`: DateTime
+  - Relación: `user` (muchos a uno con User)
+  - Relación: `messages`, `inventory`, `statistics` (uno a uno)
+- [X] Crear modelo `GameMessage` en `schema.prisma`:
+  - `id`: String (UUID)
+  - `savedGameId`: String (FK a SavedGame)
+  - `role`: String (enum: user, assistant)
+  - `content`: String (text largo)
+  - `imageUrl`: String?
+  - `items`: Json? (array de items encontrados)
+  - `order`: Int (orden del mensaje)
+  - Relación: `savedGame` (muchos a uno)
+- [X] Crear modelo `Inventory` en `schema.prisma`:
+  - `id`: String (UUID)
+  - `savedGameId`: String (FK único a SavedGame)
+  - `items`: Json (array de InventoryItem)
+  - Relación: `savedGame` (uno a uno)
+- [X] Crear modelo `GameStatistics` en `schema.prisma`:
+  - `id`: String (UUID)
+  - `savedGameId`: String (FK único a SavedGame)
+  - `decisionsCount`: Int
+  - `combatActions`: Int
+  - `explorationActions`: Int
+  - `socialActions`: Int
+  - `itemsUsed`: Int
+  - `turnsPlayed`: Int
+  - `startTime`: DateTime
+  - `survivalTime`: Int
+  - Relación: `savedGame` (uno a uno)
+- [X] Crear modelo `UnlockedEnding` en `schema.prisma`:
+  - `id`: String (UUID)
+  - `userId`: String (FK a User)
+  - `endingId`: String
+  - `achievedAt`: DateTime
+  - Relación: `user` (muchos a uno)
+  - Índice único en (userId, endingId)
+
+### 5.3 Migraciones de Base de Datos ✅
+- [X] Generar primera migración: `npx prisma migrate dev --name init`
+- [X] Verificar que las tablas se crearon correctamente en NeonConsole
+- [X] Generar Prisma Client: `npx prisma generate`
+- [X] Verificar conexión a la base de datos
+
+### 5.4 Configuración de Prisma Client ✅
+- [X] Crear archivo `lib/prisma.ts`:
+  - Singleton de PrismaClient para desarrollo y producción
+  - Prevenir múltiples instancias en hot-reload
+  - Manejo de conexiones
+- [X] Agregar `prisma` al `.gitignore` (carpeta de migraciones se mantiene)
+- [X] Documentar variables de entorno necesarias
+
+### 5.5 Sistema de Autenticación Simple ✅
+- [X] Crear interface `AuthUser` en `lib/types.ts`:
+  - `id`: string
+  - `username`: string
+  - `email`: string
+  - `createdAt`: Date
+- [X] Crear archivo `lib/auth.ts` con funciones:
+  - `createUser(username, email): Promise<User>`
+  - `getUserByUsername(username): Promise<User | null>`
+  - `getUserByEmail(email): Promise<User | null>`
+  - `getUserById(id): Promise<User | null>`
+  - Validaciones de username y email
+- [X] Crear contexto `app/contexts/auth-context.tsx`:
+  - Estado: `currentUser`, `isLoading`, `isAuthenticated`
+  - Funciones: `login(username, email)`, `logout()`, `checkAuth()`
+  - Persistir userId en localStorage ('chatia_user_id')
+  - Auto-login al cargar si existe userId
+
+### 5.6 API Routes de Autenticación ✅
+- [X] Crear endpoint `/api/auth/login/route.ts`:
+  - POST: Recibir `username` y `email`
+  - Validar formato de email
+  - Buscar usuario existente por username o email
+  - Si no existe, crear nuevo usuario
+  - Retornar datos del usuario (sin password)
+- [X] Crear endpoint `/api/auth/logout/route.ts`:
+  - POST: Limpiar sesión (opcional, se maneja en cliente)
+- [X] Crear endpoint `/api/auth/me/route.ts`:
+  - GET: Recibir userId por query
+  - Retornar datos del usuario actual
+
+### 5.7 Migración del Sistema de Guardado a Base de Datos ✅
+- [X] Crear archivo `lib/db-save-system.ts` con funciones:
+  - `saveGameToDB(userId, messages, inventory, statistics, saveName, isAutoSave): Promise<SavedGame>`
+  - `loadGameFromDB(userId, saveId): Promise<SavedGame | null>`
+  - `deleteGameFromDB(userId, saveId): Promise<boolean>`
+  - `listUserGames(userId): Promise<SaveGameMetadata[]>`
+  - `getAutoSave(userId): Promise<SavedGame | null>`
+  - `countUserSaves(userId): Promise<number>`
+- [X] Implementar límite de 10 guardados por usuario (5 manuales + 5 auto)
+- [X] Convertir datos complejos a JSON para storage en DB
+
+### 5.8 API Routes de Guardado con DB ✅
+- [X] Crear endpoint `/api/saves/create/route.ts`:
+  - POST: Crear nuevo guardado
+  - Recibir: `userId`, `name`, `messages`, `inventory`, `statistics`, `isAutoSave`
+  - Validar que el usuario no exceda el límite
+  - Guardar en DB usando Prisma
+  - Retornar SavedGame creado
+- [X] Crear endpoint `/api/saves/load/route.ts`:
+  - GET: Cargar guardado específico
+  - Query params: `userId`, `saveId`
+  - Incluir relaciones (messages, inventory, statistics)
+  - Retornar SavedGame completo
+- [X] Crear endpoint `/api/saves/list/route.ts`:
+  - GET: Listar guardados de un usuario
+  - Query param: `userId`
+  - Retornar array de SaveGameMetadata
+  - Ordenar por fecha (más reciente primero)
+- [X] Crear endpoint `/api/saves/delete/route.ts`:
+  - DELETE: Eliminar guardado
+  - Body: `userId`, `saveId`
+  - Validar ownership
+  - Eliminar de DB en cascada
+
+### 5.9 Actualización del Hook use-zombie-game ✅
+- [X] Agregar dependencia de `useAuth` hook
+- [X] Modificar `saveCurrentGame()`:
+  - Verificar que usuario esté autenticado
+  - Llamar a `/api/saves/create` en lugar de localStorage
+  - Manejar errores de red
+- [X] Modificar `loadGameState()`:
+  - Llamar a `/api/saves/load` en lugar de localStorage
+  - Validar ownership del guardado
+- [X] Modificar `listSaves()`:
+  - Llamar a `/api/saves/list` con userId
+- [X] Modificar `deleteSave()`:
+  - Llamar a `/api/saves/delete` con userId y saveId
+- [X] Remover todas las referencias a localStorage para guardados
+- [X] Mantener localStorage solo para preferencias (audio, finales desbloqueados)
+
+### 5.10 Componentes UI de Autenticación ✅
+- [X] Crear componente `app/componentes/login-dialog.tsx`:
+  - Dialog modal obligatorio al iniciar
+  - Input para username (validación: 3-20 caracteres alfanuméricos)
+  - Input para email (validación: formato email válido)
+  - Botón "Entrar" con estado de carga
+  - Feedback de errores con toast
+  - No se puede cerrar hasta autenticar
+  - Mensaje: "Usuarios existentes: solo ingresa tu username"
+- [X] Crear componente `app/componentes/user-profile.tsx`:
+  - Badge o avatar con username
+  - Dropdown menu con opciones:
+    - Ver perfil
+    - Cerrar sesión
+  - Mostrar en GameMenu
+- [X] Modificar `app/page.tsx`:
+  - Mostrar LoginDialog si no está autenticado
+  - Bloquear toda interacción hasta autenticación
+  - Pasar userId a todas las funciones de guardado
+- [X] Agregar AuthProvider en `app/layout.tsx`
+
+### 5.11 Actualización de Componentes de Guardado ✅
+- [X] Modificar `save-dialog.tsx`:
+  - Obtener límite de guardados desde contador de DB
+  - Mantener badge con `X/5` (guardados manuales)
+  - Manejar estados de carga de red
+  - Feedback de errores de red
+- [X] Modificar `load-dialog.tsx`:
+  - Cargar lista desde API en lugar de localStorage
+  - Manejar estados de carga
+  - Feedback si no hay conexión
+  - Actualizado handleDelete a async
+
+### 5.12 Migración de Datos Existentes (Opcional)
+- [ ] Crear script de migración `scripts/migrate-local-to-db.ts`:
+  - Leer guardados de localStorage
+  - Pedir username/email al usuario
+  - Crear usuario en DB
+  - Migrar cada guardado a la DB
+  - Limpiar localStorage después de migración exitosa
+- [ ] Documentar proceso de migración en README
+
+### 5.13 Manejo de Finales Desbloqueados ✅
+- [X] Crear modelo `UnlockedEnding` en `schema.prisma`:
+  - `id`: String (UUID)
+  - `userId`: String (FK a User)
+  - `endingId`: String
+  - `achievedAt`: DateTime
+  - Relación: `user` (muchos a uno)
+  - Índice único en (userId, endingId)
+- [X] Crear `lib/db-endings-system.ts` con funciones:
+  - `unlockEnding(userId, endingId)`
+  - `listUnlockedEndings(userId)`
+  - `hasUnlockedEnding(userId, endingId)`
+  - `getUnlockedEndingIds(userId)`
+- [X] Migrar sistema de finales a DB:
+  - Guardar finales desbloqueados en tabla UnlockedEnding
+  - Cargar finales desde API
+  - API endpoints: `/api/endings/unlock` y `/api/endings/list`
+- [X] Actualizar `endings-gallery.tsx` para usar datos de DB
+- [X] Actualizar `use-zombie-game.ts` para guardar finales en DB
+
+### 5.14 Documentación
+- [ ] Actualizar README.md con:
+  - Instrucciones de configuración de Prisma
+  - Variables de entorno necesarias
+  - Comandos de migración
+  - Estructura de la base de datos
+- [ ] Documentar schema de Prisma
+- [ ] Crear diagrama ER de la base de datos (opcional)
+
+---
+
+**Nueva Implementación Iniciada:** 2025-12-02
+**Estado:** 🔄 EN PROGRESO
+**Features:**
+- 🗄️ **Prisma + PostgreSQL:** Pendiente
+- 🔐 **Autenticación Simple:** Pendiente
+- 💾 **Guardado en Base de Datos:** Pendiente

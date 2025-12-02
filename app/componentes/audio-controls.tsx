@@ -131,7 +131,7 @@ export function AudioControls() {
                                 }
                             }}
                         >
-                            <span className="text-2xl">{getVolumeIcon()}</span>
+                            <span className="text-2xl" suppressHydrationWarning>{getVolumeIcon()}</span>
                         </Button>
                     </CollapsibleTrigger>
                 </div>

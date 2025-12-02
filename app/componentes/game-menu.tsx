@@ -50,7 +50,7 @@ export function GameMenu({
 
             <div className="flex items-center gap-2 flex-wrap">
                 {lastSaveTime && (
-                    <Badge variant="secondary" className="hidden sm:flex">
+                    <Badge variant="secondary" className="hidden sm:flex" suppressHydrationWarning>
                         {formatLastSaveTime(lastSaveTime)}
                     </Badge>
                 )}

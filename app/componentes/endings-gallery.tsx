@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { motion } from 'motion/react';
+import { useAuth } from '../contexts/auth-context';
 
 interface EndingsGalleryProps {
     open: boolean;
@@ -15,14 +16,29 @@ interface EndingsGalleryProps {
 }
 
 export function EndingsGallery({ open, onOpenChange }: EndingsGalleryProps) {
-    const [savedEndings, setSavedEndings] = useState<SavedEnding[]>([]);
+    const { currentUser } = useAuth();
+    const [unlockedEndingIds, setUnlockedEndingIds] = useState<string[]>([]);
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        if (open) {
-            const endings = JSON.parse(localStorage.getItem('chatia_endings') || '[]');
-            setSavedEndings(endings);
-        }
-    }, [open]);
+        const fetchUnlockedEndings = async () => {
+            if (open && currentUser) {
+                setLoading(true);
+                try {
+                    const response = await fetch(`/api/endings/list?userId=${currentUser.id}`);
+                    if (response.ok) {
+                        const endingIds = await response.json();
+                        setUnlockedEndingIds(endingIds);
+                    }
+                } catch (error) {
+                    console.error('Error loading unlocked endings:', error);
+                } finally {
+                    setLoading(false);
+                }
+            }
+        };
+        fetchUnlockedEndings();
+    }, [open, currentUser]);
 
     const getEndingEmoji = (type: string) => {
         switch (type) {
@@ -46,12 +62,11 @@ export function EndingsGallery({ open, onOpenChange }: EndingsGalleryProps) {
     };
 
     const isEndingAchieved = (endingId: string) => {
-        return savedEndings.some(saved => saved.id === endingId);
+        return unlockedEndingIds.includes(endingId);
     };
 
     const getAchievedCount = () => {
-        const uniqueEndings = new Set(savedEndings.map(e => e.id));
-        return uniqueEndings.size;
+        return unlockedEndingIds.length;
     };
 
     return (
@@ -66,57 +81,51 @@ export function EndingsGallery({ open, onOpenChange }: EndingsGalleryProps) {
                     </DialogTitle>
                 </DialogHeader>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                    {GAME_ENDINGS.map((ending, index) => {
-                        const achieved = isEndingAchieved(ending.id);
-                        const savedEnding = savedEndings.find(s => s.id === ending.id);
+                {loading ? (
+                    <div className="text-center py-8">
+                        <p>Cargando finales...</p>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                        {GAME_ENDINGS.map((ending, index) => {
+                            const achieved = isEndingAchieved(ending.id);
 
-                        return (
-                            <motion.div
-                                key={ending.id}
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: index * 0.1 }}
-                            >
-                                <Card className={achieved ? 'border-primary' : 'border-muted opacity-60'}>
-                                    <CardHeader>
-                                        <CardTitle className="flex items-center gap-2">
-                                            <span className="text-3xl">
-                                                {achieved ? getEndingEmoji(ending.type) : '❓'}
-                                            </span>
-                                            <div className="flex-1">
-                                                <div className="text-lg">
-                                                    {achieved ? ending.title : '???'}
-                                                </div>
-                                                {achieved && savedEnding && (
-                                                    <div className="text-xs text-muted-foreground">
-                                                        Alcanzado el{' '}
-                                                        {new Date(savedEnding.achievedAt).toLocaleDateString()}
+                            return (
+                                <motion.div
+                                    key={ending.id}
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: index * 0.1 }}
+                                >
+                                    <Card className={achieved ? 'border-primary' : 'border-muted opacity-60'}>
+                                        <CardHeader>
+                                            <CardTitle className="flex items-center gap-2">
+                                                <span className="text-3xl">
+                                                    {achieved ? getEndingEmoji(ending.type) : '❓'}
+                                                </span>
+                                                <div className="flex-1">
+                                                    <div className="text-lg">
+                                                        {achieved ? ending.title : '???'}
                                                     </div>
-                                                )}
-                                            </div>
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <p className="text-sm text-muted-foreground">
-                                            {achieved ? ending.description : 'Final bloqueado. Sigue jugando para desbloquearlo.'}
-                                        </p>
-                                        {achieved && savedEnding && (
-                                            <div className="mt-4 flex gap-2 text-xs">
-                                                <Badge variant="outline">
-                                                    {savedEnding.statistics.turnsPlayed} turnos
-                                                </Badge>
-                                                <Badge variant="outline">
-                                                    {savedEnding.statistics.survivalTime}min
-                                                </Badge>
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            </motion.div>
-                        );
-                    })}
-                </div>
+                                                    {achieved && (
+                                                        <div className="text-xs text-muted-foreground">
+                                                            Final desbloqueado
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <p className="text-sm text-muted-foreground">
+                                                {achieved ? ending.description : 'Final bloqueado. Sigue jugando para desbloquearlo.'}
+                                            </p>
+                                        </CardContent>
+                                    </Card>
+                                </motion.div>
+                            );
+                        })}
+                    </div>
+                )}
 
                 <div className="mt-6 text-center">
                     <Button variant="outline" onClick={() => onOpenChange(false)}>

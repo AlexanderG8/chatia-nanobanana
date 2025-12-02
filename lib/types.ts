@@ -127,3 +127,11 @@ export interface SaveGameMetadata {
     thumbnail?: string;
     survivalTime: number; // En minutos
 }
+
+// Interface para usuario autenticado
+export interface AuthUser {
+    id: string;
+    username: string;
+    email: string;
+    createdAt: Date;
+}

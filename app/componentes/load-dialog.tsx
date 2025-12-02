@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { SaveGameMetadata } from '@/lib/types';
-import { getAutoSave } from '@/lib/save-system';
 import { motion, AnimatePresence } from 'motion/react';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -14,7 +13,7 @@ interface LoadDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onLoad: (saveId: string) => Promise<boolean>;
-    onDelete: (saveId: string) => boolean;
+    onDelete: (saveId: string) => Promise<boolean>;
     saves: SaveGameMetadata[];
 }
 
@@ -25,17 +24,8 @@ export function LoadDialog({
     onDelete,
     saves
 }: LoadDialogProps) {
-    const [hasAutoSave, setHasAutoSave] = useState(false);
     const [loadingSaveId, setLoadingSaveId] = useState<string | null>(null);
     const { toast } = useToast();
-
-    useEffect(() => {
-        if (open) {
-            // Verificar si existe auto-guardado
-            const autoSave = getAutoSave();
-            setHasAutoSave(!!autoSave);
-        }
-    }, [open]);
 
     const handleLoad = async (saveId: string) => {
         setLoadingSaveId(saveId);
@@ -59,9 +49,9 @@ export function LoadDialog({
         setLoadingSaveId(null);
     };
 
-    const handleDelete = (saveId: string, saveName: string) => {
+    const handleDelete = async (saveId: string, saveName: string) => {
         if (confirm(`¿Estás seguro de eliminar "${saveName}"?`)) {
-            const success = onDelete(saveId);
+            const success = await onDelete(saveId);
             if (success) {
                 toast({
                     title: '🗑️ Partida eliminada',
@@ -99,39 +89,7 @@ export function LoadDialog({
                 </DialogHeader>
 
                 <div className="space-y-4 mt-4">
-                    {/* Auto-guardado */}
-                    {hasAutoSave && (
-                        <motion.div
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                        >
-                            <Card className="border-primary">
-                                <CardContent className="p-4">
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-lg">⚡</span>
-                                                <h3 className="font-semibold">Auto-guardado</h3>
-                                                <Badge variant="secondary">Automático</Badge>
-                                            </div>
-                                            <p className="text-sm text-muted-foreground mt-1">
-                                                Última partida guardada automáticamente
-                                            </p>
-                                        </div>
-                                        <Button
-                                            onClick={() => handleLoad('autosave')}
-                                            disabled={loadingSaveId !== null}
-                                            size="sm"
-                                        >
-                                            {loadingSaveId === 'autosave' ? 'Cargando...' : 'Cargar'}
-                                        </Button>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </motion.div>
-                    )}
-
-                    {/* Guardados manuales */}
+                    {/* Todas las partidas guardadas */}
                     <div className="space-y-3">
                         <h3 className="text-sm font-medium text-muted-foreground">
                             Partidas Guardadas ({saves.length})
@@ -175,7 +133,7 @@ export function LoadDialog({
                                                     {/* Información */}
                                                     <div className="flex-1 min-w-0">
                                                         <h3 className="font-semibold truncate">{save.name}</h3>
-                                                        <p className="text-xs text-muted-foreground mt-1">
+                                                        <p className="text-xs text-muted-foreground mt-1" suppressHydrationWarning>
                                                             {formatDate(save.timestamp)}
                                                         </p>
                                                         <div className="flex gap-2 mt-2">

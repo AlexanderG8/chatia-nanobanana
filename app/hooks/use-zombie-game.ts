@@ -1,12 +1,13 @@
 import {useState, useEffect} from 'react';
-import type { GameMassage, GenerateStoryResponse, InventoryItem, GameStatistics, GameEnding } from '@/lib/types';
+import type { GameMassage, GenerateStoryResponse, InventoryItem, GameStatistics, GameEnding, SaveGameMetadata } from '@/lib/types';
 import { GAME_CONFIG } from '@/lib/consts';
 import { checkEndingConditions, categorizeAction } from '@/lib/endings';
-import { saveGame, loadGame, autoSave, listSaves, deleteSave } from '@/lib/save-system';
 import { useAudio } from './use-audio';
+import { useAuth } from '../contexts/auth-context';
 
 export function useZombieGame(){
     const { playSFX, playMusic, stopMusic, initialize } = useAudio();
+    const { currentUser } = useAuth();
     const [messages, setMessages] = useState<GameMassage[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -34,6 +35,33 @@ export function useZombieGame(){
             playMusic('ambient-zombie', true);
         });
     }, [])
+
+    // Resetear el juego cuando cambie el usuario
+    useEffect(() => {
+        if (currentUser) {
+            // Limpiar todo el estado del juego cuando cambia el usuario
+            setMessages([]);
+            setInput('');
+            setInventory([]);
+            setInventoryFull(false);
+            setStatistics({
+                decisionsCount: 0,
+                combatActions: 0,
+                explorationActions: 0,
+                socialActions: 0,
+                itemsUsed: 0,
+                turnsPlayed: 0,
+                startTime: new Date(),
+                survivalTime: 0
+            });
+            setGameEnded(false);
+            setAchievedEnding(null);
+            setLastSaveTime(null);
+
+            // Iniciar un nuevo juego para el usuario
+            startGame();
+        }
+    }, [currentUser?.id])
 
     // Funciones de manejo de finales y estadísticas
     const triggerEnding = async (ending: GameEnding) => {
@@ -77,19 +105,23 @@ Items usados: ${statistics.itemsUsed}
                     achievedAt: new Date()
                 });
 
-                // Guardar final en localStorage
-                const savedEndings = JSON.parse(localStorage.getItem('chatia_endings') || '[]');
-                savedEndings.push({
-                    id: ending.id,
-                    type: ending.type,
-                    title: ending.title,
-                    achievedAt: new Date(),
-                    statistics: {
-                        ...statistics,
-                        survivalTime
+                // Guardar final desbloqueado en la base de datos
+                if (currentUser) {
+                    try {
+                        await fetch('/api/endings/unlock', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                                userId: currentUser.id,
+                                endingId: ending.id
+                            })
+                        });
+                    } catch (error) {
+                        console.error('Error saving unlocked ending:', error);
                     }
-                });
-                localStorage.setItem('chatia_endings', JSON.stringify(savedEndings));
+                }
             }
         } catch (error) {
             console.error('Error generating ending:', error);
@@ -120,6 +152,11 @@ Items usados: ${statistics.itemsUsed}
 
     // Funciones de guardado y carga
     const saveCurrentGame = async (saveName: string, isAutoSave: boolean = false): Promise<boolean> => {
+        if (!currentUser) {
+            console.error('Usuario no autenticado');
+            return false;
+        }
+
         setIsSaving(true);
         try {
             // Calcular tiempo de supervivencia actualizado
@@ -129,12 +166,28 @@ Items usados: ${statistics.itemsUsed}
                 survivalTime
             };
 
-            const savedGame = saveGame(messages, inventory, updatedStats, saveName, isAutoSave);
+            const response = await fetch('/api/saves/create', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    userId: currentUser.id,
+                    name: saveName,
+                    messages,
+                    inventory,
+                    statistics: updatedStats,
+                    isAutoSave
+                })
+            });
 
-            if (savedGame) {
+            if (response.ok) {
                 setLastSaveTime(new Date());
                 return true;
             }
+
+            const error = await response.json();
+            console.error('Error saving game:', error);
             return false;
         } catch (error) {
             console.error('Error saving game:', error);
@@ -145,26 +198,79 @@ Items usados: ${statistics.itemsUsed}
     };
 
     const loadGameState = async (saveId: string): Promise<boolean> => {
-        try {
-            const savedGame = loadGame(saveId);
+        if (!currentUser) {
+            console.error('Usuario no autenticado');
+            return false;
+        }
 
-            if (!savedGame) {
+        try {
+            const response = await fetch(`/api/saves/load?userId=${currentUser.id}&saveId=${saveId}`);
+
+            if (!response.ok) {
                 console.error('No se pudo cargar la partida');
                 return false;
             }
 
+            const savedGame = await response.json();
+
             // Restaurar todo el estado del juego
             setMessages(savedGame.messages);
             setInventory(savedGame.inventory);
-            setStatistics(savedGame.statistics);
+            setStatistics({
+                ...savedGame.statistics,
+                startTime: new Date(savedGame.statistics.startTime)
+            });
             setInventoryFull(savedGame.inventory.length >= GAME_CONFIG.INVENTORY.MAX_ITEMS);
             setGameEnded(false);
             setAchievedEnding(null);
-            setLastSaveTime(savedGame.timestamp);
+            setLastSaveTime(new Date(savedGame.timestamp));
 
             return true;
         } catch (error) {
             console.error('Error loading game:', error);
+            return false;
+        }
+    };
+
+    // Nueva función para listar guardados
+    const listSavesFromDB = async (): Promise<SaveGameMetadata[]> => {
+        if (!currentUser) {
+            return [];
+        }
+
+        try {
+            const response = await fetch(`/api/saves/list?userId=${currentUser.id}`);
+            if (!response.ok) {
+                return [];
+            }
+            return await response.json();
+        } catch (error) {
+            console.error('Error listing saves:', error);
+            return [];
+        }
+    };
+
+    // Nueva función para eliminar guardados
+    const deleteSaveFromDB = async (saveId: string): Promise<boolean> => {
+        if (!currentUser) {
+            return false;
+        }
+
+        try {
+            const response = await fetch('/api/saves/delete', {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    userId: currentUser.id,
+                    saveId
+                })
+            });
+
+            return response.ok;
+        } catch (error) {
+            console.error('Error deleting save:', error);
             return false;
         }
     };
@@ -419,7 +525,7 @@ Items usados: ${statistics.itemsUsed}
         restartGame,
         saveCurrentGame,
         loadGameState,
-        listSaves,
-        deleteSave,
+        listSaves: listSavesFromDB,
+        deleteSave: deleteSaveFromDB,
     }
 }

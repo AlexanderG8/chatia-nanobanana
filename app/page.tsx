@@ -13,12 +13,16 @@ import { SaveDialog } from "./componentes/save-dialog";
 import { LoadDialog } from "./componentes/load-dialog";
 import { GameMenu } from "./componentes/game-menu";
 import { AudioControls } from "./componentes/audio-controls";
+import { LoginDialog } from "./componentes/login-dialog";
+import { UserProfile } from "./componentes/user-profile";
 import { useZombieGame } from "./hooks/use-zombie-game";
+import { useAuth } from "./contexts/auth-context";
 import { InventoryItem, SaveGameMetadata } from "@/lib/types";
 import { useToast } from "@/components/ui/use-toast";
 import { GAME_CONFIG } from "@/lib/consts";
 
 export default function Home() {
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const {
     messages,
     input,
@@ -83,10 +87,13 @@ export default function Home() {
 
   // Actualizar lista de guardados cuando se abren los diálogos
   useEffect(() => {
-    if (saveDialogOpen || loadDialogOpen) {
-      const currentSaves = listSaves();
-      setSaves(currentSaves);
-    }
+    const fetchSaves = async () => {
+      if (saveDialogOpen || loadDialogOpen) {
+        const currentSaves = await listSaves();
+        setSaves(currentSaves);
+      }
+    };
+    fetchSaves();
   }, [saveDialogOpen, loadDialogOpen, listSaves]);
 
   // Handlers para guardado/carga
@@ -106,17 +113,17 @@ export default function Home() {
     const success = await loadGameState(saveId);
     if (success) {
       // Actualizar la lista de guardados después de cargar
-      const currentSaves = listSaves();
+      const currentSaves = await listSaves();
       setSaves(currentSaves);
     }
     return success;
   };
 
-  const handleDelete = (saveId: string): boolean => {
-    const success = deleteSave(saveId);
+  const handleDelete = async (saveId: string): Promise<boolean> => {
+    const success = await deleteSave(saveId);
     if (success) {
       // Actualizar la lista de guardados después de eliminar
-      const currentSaves = listSaves();
+      const currentSaves = await listSaves();
       setSaves(currentSaves);
     }
     return success;
@@ -137,6 +144,11 @@ export default function Home() {
     setDialogOpen(false);
   };
 
+  // Mostrar LoginDialog si no está autenticado
+  if (!isAuthenticated && !authLoading) {
+    return <LoginDialog />;
+  }
+
   return (
     <div className="font-sans h-screen mx-auto">
       {/* Pantalla de final */}
@@ -152,15 +164,18 @@ export default function Home() {
       <div className="flex flex-col lg:flex-row h-full gap-4 p-4">
         {/* Panel principal del juego */}
         <div className="flex-1 flex flex-col min-w-0">
-          {/* Menú del juego */}
-          <GameMenu
-            onSave={handleOpenSaveDialog}
-            onLoad={handleOpenLoadDialog}
-            onViewEndings={() => setGalleryOpen(true)}
-            lastSaveTime={lastSaveTime}
-            isSaving={isSaving}
-            gameEnded={gameEnded}
-          />
+          {/* Menú del juego con perfil de usuario */}
+          <div className="flex items-center justify-between mb-2">
+            <GameMenu
+              onSave={handleOpenSaveDialog}
+              onLoad={handleOpenLoadDialog}
+              onViewEndings={() => setGalleryOpen(true)}
+              lastSaveTime={lastSaveTime}
+              isSaving={isSaving}
+              gameEnded={gameEnded}
+            />
+            <UserProfile />
+          </div>
 
           <Conversation>
             <ConversationContent className="max-w-xl mx-auto">
